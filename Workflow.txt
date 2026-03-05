@@ -1,0 +1,32 @@
+Workflow for the Whole System
+
+
+Dashboard
+
+1. Fence Management to create GeoFences
+2. Accept auth from backend
+3. Take access token
+4. Create GeoFences
+5. Accept Metadata for GeoFences
+6. Use AI to get whole data a generate summaries
+7. Send Request with metadata + GeoFence Creation request to backend
+8. Have login/logout options
+9. Have SDK based customer access login options
+
+
+Backend
+
+1. Accept auth requests and geenrate access and refresh tokens
+2. Validate Data from Dashboard
+3. Start Stream Pipeline
+4. Send GeoFence Creation data to PostgresSQL + PostGIS Database
+5. Send metadata to CouchDB for storage
+6. Generate API keys for SDK
+
+
+SDK
+
+1. Register Device with backend Database
+2. Based on GeoLocation -> GeoFence Query by PostGIS
+3. Send a short notification by the App based on the metadata as a Overlay
+4. Only Android for the meantime
