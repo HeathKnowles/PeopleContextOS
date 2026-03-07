@@ -1,6 +1,6 @@
 import { query } from "../db/client";
 import { cacheGet, cacheSet, cacheDel } from "../db/redis";
-import { GeoFence, CreateFenceBody } from "../types";
+import type { GeoFence, CreateFenceBody } from "../types";
 
 const FENCE_TTL = 120;
 
@@ -19,6 +19,7 @@ export async function createFence(body: CreateFenceBody): Promise<GeoFence> {
       body.project_info ?? null,
     ]
   );
+  if (!rows[0]) throw new Error("Insert did not return a row");
   return rows[0];
 }
 

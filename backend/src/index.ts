@@ -1,4 +1,3 @@
-import "dotenv/config";
 import { buildApp } from "./app";
 import { runMigrations } from "./db/client";
 import { getRedis } from "./db/redis";

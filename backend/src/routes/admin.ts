@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { FastifyInstance } from "fastify";
+import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { apiKeyAuth } from "../middleware/auth";
 import {
   createFence,
@@ -26,7 +26,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
   (app as any).post(
     "/admin/fences",
     { preHandler: [apiKeyAuth] },
-    async (request, reply) => {
+    async (request: FastifyRequest<{ Body: CreateFenceBody }>, reply: FastifyReply) => {
       const { name, latitude, longitude, radius, category } = request.body;
       if (!name || latitude == null || longitude == null || !radius || !category) {
         return reply.code(400).send({
@@ -44,7 +44,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
   (app as any).get(
     "/admin/fences",
     { preHandler: [apiKeyAuth] },
-    async (request, reply) => {
+    async (request: FastifyRequest<{ Querystring: { limit?: string; offset?: string } }>, reply: FastifyReply) => {
       const limit = request.query.limit ? parseInt(request.query.limit, 10) : 100;
       const offset = request.query.offset ? parseInt(request.query.offset, 10) : 0;
       const fences = await listFences(limit, offset);
@@ -55,7 +55,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
   (app as any).get(
     "/admin/fences/:id",
     { preHandler: [apiKeyAuth] },
-    async (request, reply) => {
+    async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
       const fence = await getFenceById(request.params.id);
       if (!fence) {
         return reply
@@ -69,7 +69,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
   (app as any).delete(
     "/admin/fences/:id",
     { preHandler: [apiKeyAuth] },
-    async (request, reply) => {
+    async (request: FastifyRequest<{Params: {id: string}}>, reply: FastifyReply) => {
       const deleted = await deleteFence(request.params.id);
       if (!deleted) {
         return reply
@@ -88,7 +88,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
   (app as any).post(
     "/admin/campaigns",
     { preHandler: [apiKeyAuth] },
-    async (request, reply) => {
+    async (request: FastifyRequest<{ Body: CreateCampaignBody }>, reply: FastifyReply) => {
       const { fence_id, title, message_template, start_date } = request.body;
       if (!fence_id || !title || !message_template || !start_date) {
         return reply.code(400).send({
@@ -106,7 +106,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
   (app as any).get(
     "/admin/campaigns",
     { preHandler: [apiKeyAuth] },
-    async (request, reply) => {
+    async (request: FastifyRequest<{ Querystring: { fence_id?: string } }>, reply: FastifyReply) => {
       const campaigns = await listCampaigns(request.query.fence_id);
       return reply.send({
         success: true,
@@ -118,7 +118,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
   (app as any).patch(
     "/admin/campaigns/:id/toggle",
     { preHandler: [apiKeyAuth] },
-    async (request, reply) => {
+    async (request: FastifyRequest<{ Params: { id: string }; Body: { active: boolean } }>, reply: FastifyReply) => {
       const campaign = await toggleCampaign(request.params.id, request.body.active);
       if (!campaign) {
         return reply

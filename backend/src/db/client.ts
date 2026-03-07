@@ -1,14 +1,7 @@
 import { logger } from "../utils/logger";
-
-// Use require to avoid named-export issues with pg stubs in dev
-// In production with real @types/pg this can be `import { Pool, PoolClient } from "pg"`
-// eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-explicit-any
 const { Pool } = require("pg") as { Pool: any };
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 let pool: any | null = null;
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function getPool(): any {
   if (!pool) {
     pool = new Pool({
@@ -22,7 +15,6 @@ function getPool(): any {
   return pool;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function query<T = any>(
   sql: string,
   params?: unknown[]

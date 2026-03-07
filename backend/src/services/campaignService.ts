@@ -14,6 +14,7 @@ export async function createCampaign(body: CreateCampaignBody): Promise<Campaign
       body.end_date ? new Date(body.end_date) : null,
     ]
   );
+  if (!rows[0]) throw new Error("Failed to create campaign");
   return rows[0];
 }
 

@@ -6,9 +6,7 @@ import { eventRoutes } from "./routes/event";
 import { adminRoutes } from "./routes/admin";
 import { logger } from "./utils/logger";
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
 const cors = require("@fastify/cors");
-// eslint-disable-next-line @typescript-eslint/no-require-imports
 const rateLimit = require("@fastify/rate-limit");
 
 export async function buildApp(): Promise<ReturnType<typeof Fastify>> {

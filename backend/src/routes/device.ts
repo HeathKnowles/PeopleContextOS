@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { FastifyInstance } from "fastify";
+import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { apiKeyAuth } from "../middleware/auth";
 import { upsertDevice, getDevice } from "../services/deviceService";
 import { RegisterDeviceBody, ApiResponse, Device } from "../types";
@@ -8,8 +8,8 @@ export async function deviceRoutes(app: FastifyInstance): Promise<void> {
   (app as any).post(
     "/device/register",
     { preHandler: [apiKeyAuth] },
-    async (request, reply) => {
-      const body = request.body;
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const body = request.body as RegisterDeviceBody;
 
       if (!body.device_id || !body.platform || !body.app_version) {
         return reply.code(400).send({
@@ -37,7 +37,7 @@ export async function deviceRoutes(app: FastifyInstance): Promise<void> {
   (app as any).get(
     "/device/:id",
     { preHandler: [apiKeyAuth] },
-    async (request, reply) => {
+    async (request: FastifyRequest<{Params: {id : string}}>, reply: FastifyReply) => {
       const device = await getDevice(request.params.id);
       if (!device) {
         return reply

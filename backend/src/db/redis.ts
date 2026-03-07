@@ -1,10 +1,8 @@
 import Redis from "ioredis";
 import { logger } from "../utils/logger";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 let client: any | null = null;
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function getRedis(): any {
   if (!client) {
     client = new Redis(process.env.REDIS_URL ?? "redis://localhost:6379", {
@@ -19,7 +17,6 @@ export function getRedis(): any {
 
 export async function closeRedis(): Promise<void> {
   if (client) {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call
     await (client as { quit(): Promise<string> }).quit();
     client = null;
   }

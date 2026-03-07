@@ -13,6 +13,9 @@ export async function upsertDevice(body: RegisterDeviceBody): Promise<Device> {
      RETURNING *`,
     [body.device_id, body.platform, body.app_version, body.fcm_token ?? null]
   );
+  if (!rows[0]) {
+    throw new Error("Failed to upsert device");
+  }
   return rows[0];
 }
 

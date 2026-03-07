@@ -31,6 +31,7 @@ async function logEvent(
      RETURNING *`,
     [deviceId, fenceId, eventType, timestamp ?? new Date()]
   );
+  if (!rows[0]) throw new Error("Failed to insert event log");
   return rows[0];
 }
 
@@ -173,6 +174,7 @@ export async function getFenceStats(fenceId: string): Promise<{
     [fenceId]
   );
   const r = rows[0];
+  if (!r) throw new Error("No stats returned for fence");
   return {
     total_events: parseInt(r.total_events, 10),
     unique_devices: parseInt(r.unique_devices, 10),
