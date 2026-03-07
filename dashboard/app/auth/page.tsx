@@ -1,46 +1,56 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { signIn, signUp } from "@/lib/auth-client";
 
 type AuthMode = "login" | "signup";
 
-interface AuthPayload {
-    mode: AuthMode;
-    email: string;
-    password: string;
-    name?: string;
-}
-
-async function submitAuth(payload: AuthPayload) {
-    const res = await fetch("/api/auth", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-    });
-    return res.json();
-}
-
 export default function AuthCard() {
+    const router = useRouter();
+    const searchParams = useSearchParams();
+    const callbackUrl = searchParams.get("callbackUrl") ?? "/";
+
     const [mode, setMode] = useState<AuthMode>("login");
     const [name, setName] = useState("");
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
+    const [error, setError] = useState<string | null>(null);
+    const [loading, setLoading] = useState(false);
 
     const isSignup = mode === "signup";
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        const payload: AuthPayload = {
-            mode,
-            email,
-            password,
-            ...(isSignup && { name }),
-        };
-        await submitAuth(payload);
+        setError(null);
+        setLoading(true);
+
+        try {
+            if (isSignup) {
+                const { error: err } = await signUp.email({
+                    email,
+                    password,
+                    name,
+                    callbackURL: callbackUrl,
+                });
+                if (err) { setError(err.message ?? "Sign up failed"); return; }
+            } else {
+                const { error: err } = await signIn.email({
+                    email,
+                    password,
+                    callbackURL: callbackUrl,
+                });
+                if (err) { setError(err.message ?? "Sign in failed"); return; }
+            }
+            router.push(callbackUrl);
+            router.refresh();
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
@@ -58,7 +68,7 @@ export default function AuthCard() {
                         : "Enter your email below to login into your account"}
                 </CardDescription>
                 <CardAction>
-                    <Button variant="link" type="button" onClick={() => setMode(isSignup ? "login" : "signup")}>
+                    <Button variant="link" type="button" onClick={() => { setMode(isSignup ? "login" : "signup"); setError(null); }}>
                         {isSignup ? "Login" : "Sign Up"}
                     </Button>
                 </CardAction>
@@ -95,17 +105,21 @@ export default function AuthCard() {
                             <Input
                                 id="password"
                                 type="password"
+                                placeholder="Min. 8 characters"
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
                                 required
                             />
                         </div>
+                        {error && (
+                            <p className="text-sm text-destructive">{error}</p>
+                        )}
                     </div>
                 </form>
             </CardContent>
             <CardFooter className="flex-col gap-2">
-                <Button type="submit" form="auth-form" className="w-full">
-                    {isSignup ? "Sign Up" : "Login"}
+                <Button type="submit" form="auth-form" className="w-full" disabled={loading}>
+                    {loading ? "Please wait…" : isSignup ? "Sign Up" : "Login"}
                 </Button>
             </CardFooter>
         </Card>
