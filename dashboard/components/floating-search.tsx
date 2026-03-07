@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Search, Loader2, X, MapPin } from "lucide-react";
+import { Search, Loader2, X, MapPin, PlusCircle } from "lucide-react";
 import { useMapSearch } from "@/components/map-search-context";
 import { cn } from "@/lib/utils";
 
@@ -15,7 +15,7 @@ interface Suggestion {
 }
 
 export function FloatingSearch() {
-    const { flyToLocation } = useMapSearch();
+    const { flyToLocation, setPendingPin } = useMapSearch();
 
     const [query, setQuery] = useState("");
     const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
@@ -165,23 +165,43 @@ export function FloatingSearch() {
                 {open && suggestions.length > 0 && (
                     <ul className="absolute top-[calc(100%+6px)] left-0 right-0 bg-white rounded-xl shadow-[0_4px_16px_rgba(0,0,0,0.18)] border border-black/5 py-1 overflow-hidden">
                         {suggestions.map((s, i) => (
-                            <li key={s.place_id}>
+                            <li
+                                key={s.place_id}
+                                className={cn(
+                                    "flex items-start hover:bg-gray-50 transition-colors",
+                                    i === activeIndex && "bg-gray-50"
+                                )}
+                            >
+                                {/* Main result — fly to location */}
                                 <button
                                     type="button"
-                                    // preventDefault stops the input losing focus before click fires
                                     onMouseDown={(e) => {
                                         e.preventDefault();
                                         selectSuggestion(s);
                                     }}
-                                    className={cn(
-                                        "w-full flex items-start gap-3 px-4 py-2.5 text-left text-sm hover:bg-gray-50 transition-colors",
-                                        i === activeIndex && "bg-gray-50"
-                                    )}
+                                    className="flex-1 flex items-start gap-3 px-4 py-2.5 text-left text-sm"
                                 >
                                     <MapPin className="size-4 shrink-0 mt-0.5 text-muted-foreground" />
                                     <span className="line-clamp-2 leading-snug text-gray-700">
                                         {s.display_name}
                                     </span>
+                                </button>
+                                {/* Add as geofence */}
+                                <button
+                                    type="button"
+                                    title="Add as geofence"
+                                    onMouseDown={(e) => {
+                                        e.preventDefault();
+                                        setPendingPin({
+                                            lat: parseFloat(s.lat),
+                                            lon: parseFloat(s.lon),
+                                            displayName: s.display_name,
+                                        });
+                                        setOpen(false);
+                                    }}
+                                    className="shrink-0 px-3 py-2.5 text-muted-foreground hover:text-primary transition-colors"
+                                >
+                                    <PlusCircle className="size-4" />
                                 </button>
                             </li>
                         ))}

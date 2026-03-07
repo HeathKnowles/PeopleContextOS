@@ -1,12 +1,20 @@
 "use client";
 
-import { createContext, useCallback, useContext, useRef } from "react";
+import { createContext, useCallback, useContext, useRef, useState } from "react";
 import type { Map as LeafletMap, Marker } from "leaflet";
+
+export interface PendingPin {
+    lat: number;
+    lon: number;
+    displayName: string;
+}
 
 interface MapSearchContextType {
     mapRef: React.RefObject<LeafletMap | null>;
     markerRef: React.RefObject<Marker | null>;
     flyToLocation: (lat: number, lon: number, displayName: string) => Promise<void>;
+    pendingPin: PendingPin | null;
+    setPendingPin: (pin: PendingPin | null) => void;
 }
 
 const MapSearchContext = createContext<MapSearchContextType | null>(null);
@@ -14,6 +22,7 @@ const MapSearchContext = createContext<MapSearchContextType | null>(null);
 export function MapSearchProvider({ children }: { children: React.ReactNode }) {
     const mapRef = useRef<LeafletMap | null>(null);
     const markerRef = useRef<Marker | null>(null);
+    const [pendingPin, setPendingPin] = useState<PendingPin | null>(null);
 
     const flyToLocation = useCallback(
         async (lat: number, lon: number, displayName: string) => {
@@ -38,7 +47,9 @@ export function MapSearchProvider({ children }: { children: React.ReactNode }) {
     );
 
     return (
-        <MapSearchContext.Provider value={{ mapRef, markerRef, flyToLocation }}>
+        <MapSearchContext.Provider
+            value={{ mapRef, markerRef, flyToLocation, pendingPin, setPendingPin }}
+        >
             {children}
         </MapSearchContext.Provider>
     );
