@@ -1,8 +1,10 @@
+import { Pool } from "pg";
+import type { PoolClient } from "pg";
 import { logger } from "../utils/logger";
-const { Pool } = require("pg") as { Pool: any };
-let pool: any | null = null;
 
-function getPool(): any {
+let pool: Pool | null = null;
+
+function getPool(): Pool {
   if (!pool) {
     pool = new Pool({
       connectionString: process.env.DATABASE_URL,
@@ -15,7 +17,7 @@ function getPool(): any {
   return pool;
 }
 
-export async function query<T = any>(
+export async function query<T = Record<string, unknown>>(
   sql: string,
   params?: unknown[]
 ): Promise<T[]> {
@@ -24,9 +26,7 @@ export async function query<T = any>(
 }
 
 export async function withTransaction<T>(
-  fn: (client: {
-    query(sql: string, params?: unknown[]): Promise<{ rows: unknown[] }>;
-  }) => Promise<T>
+  fn: (client: PoolClient) => Promise<T>
 ): Promise<T> {
   const client = await getPool().connect();
   try {
@@ -110,6 +110,67 @@ export async function runMigrations(): Promise<void> {
 
   await db.query(`CREATE INDEX IF NOT EXISTS event_logs_device_idx ON event_logs (device_id);`);
   await db.query(`CREATE INDEX IF NOT EXISTS event_logs_fence_idx ON event_logs (fence_id);`);
+
+  // ─── Better-Auth tables ────────────────────────────────────────────────────
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS "user" (
+      id             TEXT        PRIMARY KEY,
+      name           TEXT        NOT NULL,
+      email          TEXT        NOT NULL UNIQUE,
+      email_verified BOOLEAN     NOT NULL DEFAULT FALSE,
+      image          TEXT,
+      created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS "session" (
+      id         TEXT        PRIMARY KEY,
+      expires_at TIMESTAMPTZ NOT NULL,
+      token      TEXT        NOT NULL UNIQUE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      ip_address TEXT,
+      user_agent TEXT,
+      user_id    TEXT        NOT NULL REFERENCES "user"(id) ON DELETE CASCADE
+    );
+  `);
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS "account" (
+      id                       TEXT        PRIMARY KEY,
+      account_id               TEXT        NOT NULL,
+      provider_id              TEXT        NOT NULL,
+      user_id                  TEXT        NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+      access_token             TEXT,
+      refresh_token            TEXT,
+      id_token                 TEXT,
+      access_token_expires_at  TIMESTAMPTZ,
+      refresh_token_expires_at TIMESTAMPTZ,
+      scope                    TEXT,
+      password                 TEXT,
+      created_at               TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at               TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS "verification" (
+      id         TEXT        PRIMARY KEY,
+      identifier TEXT        NOT NULL,
+      value      TEXT        NOT NULL,
+      expires_at TIMESTAMPTZ NOT NULL,
+      created_at TIMESTAMPTZ,
+      updated_at TIMESTAMPTZ
+    );
+  `);
+
+  await db.query(`CREATE INDEX IF NOT EXISTS session_user_id_idx         ON "session"(user_id);`);
+  await db.query(`CREATE INDEX IF NOT EXISTS session_token_idx           ON "session"(token);`);
+  await db.query(`CREATE INDEX IF NOT EXISTS account_user_id_idx         ON "account"(user_id);`);
+  await db.query(`CREATE INDEX IF NOT EXISTS account_provider_idx        ON "account"(provider_id, account_id);`);
+  await db.query(`CREATE INDEX IF NOT EXISTS verification_identifier_idx ON "verification"(identifier);`);
 
   logger.info("Database migrations complete");
 }

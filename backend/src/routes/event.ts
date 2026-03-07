@@ -1,17 +1,16 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { apiKeyAuth } from "../middleware/auth";
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import { jwtAuth } from "../middleware/auth";
 import {
   processTriggerEvent,
   getEventLogs,
   getFenceStats,
 } from "../services/eventEngine";
-import { TriggerEventBody, ApiResponse } from "../types";
+import type { TriggerEventBody, ApiResponse } from "../types";
 
 export async function eventRoutes(app: FastifyInstance): Promise<void> {
   (app as any).post(
     "/event/trigger",
-    { preHandler: [apiKeyAuth] },
+    { preHandler: [jwtAuth] },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const { device_id, fence_id, event_type } = request.body as TriggerEventBody;
 
@@ -39,7 +38,7 @@ export async function eventRoutes(app: FastifyInstance): Promise<void> {
 
   (app as any).get(
     "/event/logs",
-    { preHandler: [apiKeyAuth] },
+    { preHandler: [jwtAuth] },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const { fence_id, device_id, limit } = request.query as { fence_id?: string; device_id?: string; limit?: string };
       const limitN = limit ? parseInt(limit, 10) : 50;
@@ -50,7 +49,7 @@ export async function eventRoutes(app: FastifyInstance): Promise<void> {
 
   (app as any).get(
     "/event/stats/:fence_id",
-    { preHandler: [apiKeyAuth] },
+    { preHandler: [jwtAuth] },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const stats = await getFenceStats((request.params as { fence_id: string }).fence_id);
       return reply.send({ success: true, data: stats } satisfies ApiResponse);

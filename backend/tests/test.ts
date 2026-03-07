@@ -7,7 +7,7 @@
  */
 
 import { buildApp } from "../src/app";
-import { FastifyInstance } from "fastify";
+import type { FastifyInstance } from "fastify";
 
 type Result = { name: string; passed: boolean; error?: string };
 const results: Result[] = [];

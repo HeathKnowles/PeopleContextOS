@@ -1,5 +1,5 @@
 import { query } from "../db/client";
-import { Device, RegisterDeviceBody } from "../types";
+import type { Device, RegisterDeviceBody } from "../types";
 
 export async function upsertDevice(body: RegisterDeviceBody): Promise<Device> {
   const rows = await query<Device>(

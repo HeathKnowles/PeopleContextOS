@@ -100,6 +100,26 @@ export interface NotificationPayload {
   data?: Record<string, string>;
 }
 
+// ─── Auth ─────────────────────────────────────────────────────────────────────
+
+export interface JwtPayload {
+  /** Subject — identifies the caller (e.g. service name or client ID) */
+  sub: string;
+  /** Issued-at (Unix seconds) */
+  iat?: number;
+  /** Expiry (Unix seconds) */
+  exp?: number;
+  /** Optional role for future RBAC */
+  role?: string;
+}
+
+// Augment FastifyRequest so request.user is typed in all route handlers
+declare module "fastify" {
+  interface FastifyRequest {
+    user: JwtPayload;
+  }
+}
+
 // ─── API ──────────────────────────────────────────────────────────────────────
 
 export interface ApiResponse<T = unknown> {

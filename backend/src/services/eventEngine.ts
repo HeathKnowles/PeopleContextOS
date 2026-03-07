@@ -4,7 +4,7 @@ import { findFencesContainingPoint } from "./fenceService";
 import { getActiveCampaignForFence } from "./campaignService";
 import { getDevice } from "./deviceService";
 import { sendPushNotification } from "./notificationService";
-import { EventLog, LocationEventBody, TriggerEventBody } from "../types";
+import type { EventLog, LocationEventBody, TriggerEventBody } from "../types";
 import { logger } from "../utils/logger";
 
 // 30-minute dedup window: same device + same fence = one notification

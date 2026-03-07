@@ -1,5 +1,5 @@
 import { query } from "../db/client";
-import { Campaign, CreateCampaignBody } from "../types";
+import type { Campaign, CreateCampaignBody } from "../types";
 
 export async function createCampaign(body: CreateCampaignBody): Promise<Campaign> {
   const rows = await query<Campaign>(

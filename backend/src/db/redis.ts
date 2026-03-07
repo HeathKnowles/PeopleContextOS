@@ -1,9 +1,9 @@
 import Redis from "ioredis";
 import { logger } from "../utils/logger";
 
-let client: any | null = null;
+let client: Redis | null = null;
 
-export function getRedis(): any {
+export function getRedis(): Redis {
   if (!client) {
     client = new Redis(process.env.REDIS_URL ?? "redis://localhost:6379", {
       maxRetriesPerRequest: 3,
@@ -17,7 +17,7 @@ export function getRedis(): any {
 
 export async function closeRedis(): Promise<void> {
   if (client) {
-    await (client as { quit(): Promise<string> }).quit();
+    await client.quit();
     client = null;
   }
 }

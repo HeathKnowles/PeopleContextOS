@@ -1,10 +1,9 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { apiKeyAuth } from "../middleware/auth";
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import { jwtAuth } from "../middleware/auth";
 import { processLocationEvent } from "../services/eventEngine";
 import { findNearbyFences } from "../services/fenceService";
 import { updateLastSeen } from "../services/deviceService";
-import {
+import type {
   LocationEventBody,
   NearbyFencesQuery,
   ApiResponse,
@@ -14,7 +13,7 @@ import {
 export async function locationRoutes(app: FastifyInstance): Promise<void> {
   (app as any).post(
     "/location/event",
-    { preHandler: [apiKeyAuth] },
+    { preHandler: [jwtAuth] },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const { device_id, lat, lng, timestamp } = request.body as LocationEventBody;
 
@@ -45,7 +44,7 @@ export async function locationRoutes(app: FastifyInstance): Promise<void> {
 
   (app as any).get(
     "/fences/nearby",
-    { preHandler: [apiKeyAuth] },
+    { preHandler: [jwtAuth] },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const { lat, lng, radius } = request.query as NearbyFencesQuery;
       const latN = parseFloat(lat);

@@ -1,24 +1,43 @@
-import { FastifyRequest, FastifyReply } from "fastify";
+import type { FastifyRequest, FastifyReply } from "fastify";
+import jwt from "jsonwebtoken";
+import type { JwtPayload } from "../types";
 
-const validKeys = new Set<string>(
-  (process.env.VALID_API_KEYS ?? "dev-key-1")
-    .split(",")
-    .map((k) => k.trim())
-    .filter(Boolean)
-);
-
-export async function apiKeyAuth(
+export async function jwtAuth(
   request: FastifyRequest,
   reply: FastifyReply
 ): Promise<void> {
-  const header = request.headers["x-api-key"] as string | undefined;
-  const bearer = (request.headers["authorization"] as string | undefined ?? "")
-    .replace(/^Bearer\s+/i, "");
-  const key = header ?? bearer;
+  const authorization = request.headers["authorization"];
 
-  if (!key || !validKeys.has(key)) {
-    reply
-      .code(401)
-      .send({ success: false, error: "Invalid or missing API key" });
+  if (!authorization?.startsWith("Bearer ")) {
+    return reply.code(401).send({
+      success: false,
+      error: "Missing or malformed Authorization header",
+    });
+  }
+
+  const token = authorization.slice(7);
+  const secret = process.env.JWT_SECRET;
+
+  if (!secret) {
+    request.log.error("JWT_SECRET is not configured");
+    return reply.code(500).send({
+      success: false,
+      error: "Server authentication is not configured",
+    });
+  }
+
+  try {
+    const payload = jwt.verify(token, secret) as JwtPayload;
+    request.user = payload;
+  } catch (err) {
+    if (err instanceof jwt.TokenExpiredError) {
+      return reply.code(401).send({ success: false, error: "Token expired" });
+    }
+    if (err instanceof jwt.JsonWebTokenError) {
+      return reply.code(401).send({ success: false, error: "Invalid token" });
+    }
+    throw err;
   }
 }
+
+

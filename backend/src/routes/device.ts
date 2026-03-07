@@ -1,13 +1,13 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { apiKeyAuth } from "../middleware/auth";
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import { jwtAuth } from "../middleware/auth";
 import { upsertDevice, getDevice } from "../services/deviceService";
-import { RegisterDeviceBody, ApiResponse, Device } from "../types";
+import type { RegisterDeviceBody, ApiResponse, Device } from "../types";
 
 export async function deviceRoutes(app: FastifyInstance): Promise<void> {
   (app as any).post(
     "/device/register",
-    { preHandler: [apiKeyAuth] },
+    { preHandler: [jwtAuth] },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const body = request.body as RegisterDeviceBody;
 
@@ -36,7 +36,7 @@ export async function deviceRoutes(app: FastifyInstance): Promise<void> {
 
   (app as any).get(
     "/device/:id",
-    { preHandler: [apiKeyAuth] },
+    { preHandler: [jwtAuth] },
     async (request: FastifyRequest<{Params: {id : string}}>, reply: FastifyReply) => {
       const device = await getDevice(request.params.id);
       if (!device) {

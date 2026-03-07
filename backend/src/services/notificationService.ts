@@ -11,7 +11,7 @@ const admin = require("firebase-admin") as {
     }): Promise<string>;
   };
 };
-import { NotificationPayload } from "../types";
+import type { NotificationPayload } from "../types";
 import { logger } from "../utils/logger";
 
 let initialised = false;
