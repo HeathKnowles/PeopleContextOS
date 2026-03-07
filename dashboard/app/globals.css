@@ -124,3 +124,63 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* ── Leaflet popup / tooltip fixes ────────────────────────────────────────
+   Tailwind preflight resets box-sizing and removes margins/padding on all
+   elements, which breaks Leaflet's popup tip (the caret triangle).
+   These overrides restore the expected rendering. */
+.leaflet-container {
+  font-family: inherit;
+  font-size: 0.875rem;
+}
+
+.leaflet-popup-content-wrapper {
+  border-radius: 0.5rem;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+  padding: 0;
+}
+
+.leaflet-popup-content {
+  margin: 0.625rem 0.875rem;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+/* Restore the popup tip triangle broken by Tailwind preflight */
+.leaflet-popup-tip-container {
+  width: 40px;
+  height: 20px;
+  position: absolute;
+  left: 50%;
+  margin-left: -20px;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.leaflet-popup-tip {
+  width: 17px;
+  height: 17px;
+  padding: 1px;
+  margin: -10px auto 0;
+  transform: rotate(45deg);
+  background: white;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+  box-sizing: border-box;
+}
+
+/* Zoom control — cleaner appearance */
+.leaflet-control-zoom a {
+  width: 2rem;
+  height: 2rem;
+  line-height: 2rem;
+  font-size: 1.1rem;
+  border-radius: 0.375rem;
+  color: inherit;
+}
+
+.leaflet-control-zoom {
+  border: none !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
+  border-radius: 0.5rem !important;
+  overflow: hidden;
+}
