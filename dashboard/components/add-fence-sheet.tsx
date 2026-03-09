@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useMapSearch } from "@/components/map-search-context";
+import { useFences } from "@/components/fences-context";
 import { createFence } from "@/lib/fences-api";
 import {
     Sheet,
@@ -39,6 +40,7 @@ const CATEGORIES = [
 
 export function AddFenceSheet() {
     const { pendingPin, setPendingPin } = useMapSearch();
+    const { addFence } = useFences();
 
     // ── Form fields ──────────────────────────────────────────────────────────
     const [name, setName] = useState("");
@@ -136,7 +138,7 @@ export function AddFenceSheet() {
         setSaving(true);
         setError(null);
         try {
-            await createFence({
+            const fence = await createFence({
                 name: name.trim(),
                 latitude: parsedLat,
                 longitude: parsedLon,
@@ -144,6 +146,7 @@ export function AddFenceSheet() {
                 category,
                 project_info: projectInfo.trim() || undefined,
             });
+            addFence(fence); // instantly adds to the shared list
             handleClose();
         } catch (err) {
             setError(err instanceof Error ? err.message : "Failed to save geofence.");

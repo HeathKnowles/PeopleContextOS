@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { signIn, signUp } from "@/lib/auth-client";
+import { fetchAdminToken } from "@/lib/admin-token";
 
 type AuthMode = "login" | "signup";
 
@@ -46,6 +47,8 @@ export default function AuthCard() {
                 });
                 if (err) { setError(err.message ?? "Sign in failed"); return; }
             }
+            // Pre-fetch the admin JWT so the first API call is instant
+            await fetchAdminToken();
             router.push(callbackUrl);
             router.refresh();
         } finally {

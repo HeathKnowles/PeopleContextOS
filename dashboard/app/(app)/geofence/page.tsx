@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
-import { listFences, deleteFence } from "@/lib/fences-api";
+import { useMemo, useState } from "react";
 import type { GeoFence } from "@/lib/types";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -15,6 +14,7 @@ import {
 import { Search, Trash2, MapPin, Loader2, RefreshCw, AlertCircle, PlusCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useMapSearch } from "@/components/map-search-context";
+import { useFences } from "@/components/fences-context";
 
 function FenceCard({
     fence,
@@ -95,36 +95,8 @@ function FenceCard({
 
 export default function GeofencePage() {
     const { setPendingPin } = useMapSearch();
-    const [fences, setFences] = useState<GeoFence[]>([]);;
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+    const { fences, loading, error, refresh, removeFence } = useFences();
     const [search, setSearch] = useState("");
-
-    const load = async () => {
-        setLoading(true);
-        setError(null);
-        try {
-            const data = await listFences();
-            setFences(data);
-        } catch (err) {
-            setError(err instanceof Error ? err.message : "Failed to load geofences.");
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    useEffect(() => {
-        load();
-    }, []);
-
-    const handleDelete = (id: string) => {
-        // Optimistic removal
-        setFences((prev) => prev.filter((f) => f.id !== id));
-        deleteFence(id).catch(() => {
-            // On failure re-fetch to restore state
-            load();
-        });
-    };
 
     const filtered = useMemo(() => {
         if (!search.trim()) return fences;
@@ -154,7 +126,7 @@ export default function GeofencePage() {
                         <Button
                             size="icon"
                             variant="ghost"
-                            onClick={load}
+                            onClick={refresh}
                             disabled={loading}
                             title="Refresh"
                         >
@@ -197,7 +169,7 @@ export default function GeofencePage() {
                     <div className="flex flex-col items-center justify-center h-40 gap-3 text-destructive">
                         <AlertCircle className="size-8" />
                         <p className="text-sm text-center">{error}</p>
-                        <Button variant="outline" size="sm" onClick={load}>
+                        <Button variant="outline" size="sm" onClick={refresh}>
                             Retry
                         </Button>
                     </div>
@@ -216,7 +188,7 @@ export default function GeofencePage() {
                             <FenceCard
                                 key={fence.id}
                                 fence={fence}
-                                onDelete={handleDelete}
+                                onDelete={removeFence}
                             />
                         ))}
                     </div>

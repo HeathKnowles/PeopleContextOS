@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { MapSearchProvider } from "@/components/map-search-context";
+import { FencesProvider } from "@/components/fences-context";
 import { FloatingSearch } from "@/components/floating-search";
 import { AddFenceSheet } from "@/components/add-fence-sheet";
 
@@ -13,17 +14,17 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
     return (
         <MapSearchProvider>
-            <SidebarProvider>
-                <AppSidebar />
-                <main className="relative flex-1 overflow-hidden">
-                    <SidebarTrigger className="absolute top-3 left-3 z-1000" />
-                    {/* Floating search only shown on the map page */}
-                    {isMapPage && <FloatingSearch />}
-                    {children}
-                </main>
-                {/* Sheet is always mounted so it can open from any page */}
-                <AddFenceSheet />
-            </SidebarProvider>
+            <FencesProvider>
+                <SidebarProvider>
+                    <AppSidebar />
+                    <main className="relative flex-1 overflow-hidden">
+                        <SidebarTrigger className="absolute top-3 left-3 z-1000" />
+                        {isMapPage && <FloatingSearch />}
+                        {children}
+                    </main>
+                    <AddFenceSheet />
+                </SidebarProvider>
+            </FencesProvider>
         </MapSearchProvider>
     );
 }
