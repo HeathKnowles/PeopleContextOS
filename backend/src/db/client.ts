@@ -51,7 +51,17 @@ export async function closePool(): Promise<void> {
 
 export async function runMigrations(): Promise<void> {
   const db = getPool();
-  await db.query(`CREATE EXTENSION IF NOT EXISTS postgis;`);
+
+  // PostGIS must be created by a superuser (run once manually):
+  //   sudo -u postgres psql -d <dbname> -c "CREATE EXTENSION IF NOT EXISTS postgis;"
+  // The app user only needs USAGE on the extension, not CREATE.
+  // We skip this silently if it already exists or we lack permission.
+  try {
+    await db.query(`CREATE EXTENSION IF NOT EXISTS postgis;`);
+  } catch (err) {
+    // Non-fatal — PostGIS may already be installed or require superuser (see note above)
+    logger.debug({ err }, "CREATE EXTENSION postgis skipped");
+  }
 
   await db.query(`
     CREATE TABLE IF NOT EXISTS devices (
@@ -78,13 +88,21 @@ export async function runMigrations(): Promise<void> {
     );
   `);
 
-  await db.query(`
-    CREATE INDEX IF NOT EXISTS geo_fences_location_idx
-    ON geo_fences
-    USING GIST (
-      ST_SetSRID(ST_MakePoint(longitude, latitude), 4326)::geography
-    );
-  `);
+  // This index uses PostGIS types — verify PostGIS is reachable before attempting
+  try {
+    const pgisCheck = await db.query<{ postgis_version: string }>(`SELECT PostGIS_Lib_Version() AS postgis_version;`);
+    logger.info({ postgis_version: pgisCheck.rows[0]?.postgis_version }, "PostGIS detected");
+    await db.query(`
+      CREATE INDEX IF NOT EXISTS geo_fences_location_idx
+      ON geo_fences
+      USING GIST (
+        geography(ST_SetSRID(ST_MakePoint(longitude, latitude), 4326))
+      );
+    `);
+    logger.info("geo_fences GIST index ready");
+  } catch (err) {
+    logger.warn({ err }, "geo_fences GIST index not created — PostGIS may not be installed.");
+  }
 
   await db.query(`
     CREATE TABLE IF NOT EXISTS campaigns (

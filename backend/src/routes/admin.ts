@@ -1,5 +1,8 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import { fromNodeHeaders } from "better-auth/node";
+import { auth } from "../lib/auth";
 import { jwtAuth } from "../middleware/auth";
+import { signToken } from "../utils/jwt";
 import {
   createFence,
   getFenceById,
@@ -20,6 +23,24 @@ import type {
 } from "../types";
 
 export async function adminRoutes(app: FastifyInstance): Promise<void> {
+  // ─── Session → JWT token exchange ───────────────────────────────────────
+  // Called by the dashboard after login to get a Bearer token for /admin/* routes.
+  (app as any).post(
+    "/admin/token",
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const session = await auth.api.getSession({
+        headers: fromNodeHeaders(request.headers),
+      });
+      if (!session?.user) {
+        return reply
+          .code(401)
+          .send({ success: false, error: "Not authenticated" } satisfies ApiResponse);
+      }
+      const token = signToken(session.user.id, { role: "admin" });
+      return reply.send({ success: true, data: { token } } satisfies ApiResponse<{ token: string }>);
+    }
+  );
+
   // ─── GeoFence CRUD ──────────────────────────────────────────────────────
 
   (app as any).post(
