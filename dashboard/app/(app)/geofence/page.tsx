@@ -41,9 +41,9 @@ function FenceCard({
                         <CardTitle className="text-base truncate">{fence.name}</CardTitle>
                         <CardDescription className="mt-0.5 capitalize">
                             {fence.category}
-                            {fence.project_info && (
+                            {fence.authority && (
                                 <span className="ml-2 text-muted-foreground/60">
-                                    · {fence.project_info}
+                                    · {fence.authority}
                                 </span>
                             )}
                         </CardDescription>
@@ -88,6 +88,16 @@ function FenceCard({
                         {new Date(fence.created_at).toLocaleDateString()}
                     </span>
                 </div>
+                {fence.impact_summary && (
+                    <p className="mt-2 text-xs text-muted-foreground/80 line-clamp-2">{fence.impact_summary}</p>
+                )}
+                {(fence.start_date || fence.completion_date) && (
+                    <p className="mt-1.5 text-xs text-muted-foreground/70">
+                        {fence.start_date && new Date(fence.start_date).toLocaleDateString()}
+                        {fence.start_date && fence.completion_date && " → "}
+                        {fence.completion_date && new Date(fence.completion_date).toLocaleDateString()}
+                    </p>
+                )}
             </CardContent>
         </Card>
     );
@@ -105,7 +115,9 @@ export default function GeofencePage() {
             (f) =>
                 f.name.toLowerCase().includes(q) ||
                 f.category.toLowerCase().includes(q) ||
-                f.project_info?.toLowerCase().includes(q) ||
+                f.description?.toLowerCase().includes(q) ||
+                f.impact_summary?.toLowerCase().includes(q) ||
+                f.authority?.toLowerCase().includes(q) ||
                 String(f.latitude).includes(q) ||
                 String(f.longitude).includes(q)
         );
@@ -150,7 +162,7 @@ export default function GeofencePage() {
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none" />
                     <Input
                         type="search"
-                        placeholder="Search by name, category, or project…"
+                        placeholder="Search by name, category, authority…"
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
                         className="pl-9"

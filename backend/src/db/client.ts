@@ -63,6 +63,7 @@ export async function runMigrations(): Promise<void> {
     logger.debug({ err }, "CREATE EXTENSION postgis skipped");
   }
 
+  // ─── Devices ──────────────────────────────────────────────────────────────
   await db.query(`
     CREATE TABLE IF NOT EXISTS devices (
       device_id   TEXT        PRIMARY KEY,
@@ -74,50 +75,90 @@ export async function runMigrations(): Promise<void> {
     );
   `);
 
+  // ─── Clean old app tables (drop in FK order for a clean slate) ────────────
+  await db.query(`DROP TABLE IF EXISTS event_logs CASCADE;`);
+  await db.query(`DROP TABLE IF EXISTS campaign_targets CASCADE;`);
+  await db.query(`DROP TABLE IF EXISTS campaigns CASCADE;`);
+  await db.query(`DROP TABLE IF EXISTS geo_fences CASCADE;`);
+  await db.query(`DROP TABLE IF EXISTS development_sites CASCADE;`);
+
+  // ─── Development Sites ────────────────────────────────────────────────────
   await db.query(`
-    CREATE TABLE IF NOT EXISTS geo_fences (
+    CREATE TABLE development_sites (
+      id               UUID             PRIMARY KEY DEFAULT gen_random_uuid(),
+      name             TEXT             NOT NULL,
+      category         TEXT             NOT NULL,
+      description      TEXT,
+      latitude         DOUBLE PRECISION NOT NULL,
+      longitude        DOUBLE PRECISION NOT NULL,
+      geo_polygon      GEOMETRY(POLYGON, 4326),
+      impact_summary   TEXT,
+      start_date       DATE,
+      completion_date  DATE,
+      authority        TEXT,
+      created_at       TIMESTAMPTZ      NOT NULL DEFAULT NOW(),
+      updated_at       TIMESTAMPTZ      NOT NULL DEFAULT NOW()
+    );
+  `);
+
+  // ─── GeoFences ────────────────────────────────────────────────────────────
+  await db.query(`
+    CREATE TABLE geo_fences (
+      id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+      site_id    UUID        NOT NULL REFERENCES development_sites(id) ON DELETE CASCADE,
+      radius     INTEGER     NOT NULL CHECK (radius > 0),
+      geometry   GEOGRAPHY,
+      active     BOOLEAN     NOT NULL DEFAULT TRUE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+
+  // ─── Spatial indexes ──────────────────────────────────────────────────────
+  try {
+    const pgisCheck = await db.query<{ postgis_version: string }>(
+      `SELECT PostGIS_Lib_Version() AS postgis_version;`
+    );
+    logger.info({ postgis_version: pgisCheck.rows[0]?.postgis_version }, "PostGIS detected");
+    await db.query(`
+      CREATE INDEX development_sites_location_idx
+      ON development_sites
+      USING GIST (geography(ST_SetSRID(ST_MakePoint(longitude, latitude), 4326)));
+    `);
+    await db.query(`
+      CREATE INDEX geo_fences_geometry_idx ON geo_fences USING GIST (geometry);
+    `);
+    logger.info("Spatial indexes ready");
+  } catch (err) {
+    logger.warn({ err }, "Spatial indexes not created — PostGIS may not be fully installed.");
+  }
+
+  // ─── Campaigns ────────────────────────────────────────────────────────────
+  await db.query(`
+    CREATE TABLE campaigns (
       id           UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-      name         TEXT        NOT NULL,
-      latitude     DOUBLE PRECISION NOT NULL,
-      longitude    DOUBLE PRECISION NOT NULL,
-      radius       INT         NOT NULL,
-      category     TEXT        NOT NULL DEFAULT 'general',
-      metadata     JSONB       NOT NULL DEFAULT '{}',
-      project_info TEXT,
+      site_id      UUID        NOT NULL REFERENCES development_sites(id) ON DELETE CASCADE,
+      title        TEXT        NOT NULL,
+      message      TEXT        NOT NULL,
+      media_url    TEXT,
+      start_time   TIMESTAMPTZ,
+      end_time     TIMESTAMPTZ,
+      trigger_type TEXT        NOT NULL CHECK (trigger_type IN ('entry','dwell','exit')),
       created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
   `);
 
-  // This index uses PostGIS types — verify PostGIS is reachable before attempting
-  try {
-    const pgisCheck = await db.query<{ postgis_version: string }>(`SELECT PostGIS_Lib_Version() AS postgis_version;`);
-    logger.info({ postgis_version: pgisCheck.rows[0]?.postgis_version }, "PostGIS detected");
-    await db.query(`
-      CREATE INDEX IF NOT EXISTS geo_fences_location_idx
-      ON geo_fences
-      USING GIST (
-        geography(ST_SetSRID(ST_MakePoint(longitude, latitude), 4326))
-      );
-    `);
-    logger.info("geo_fences GIST index ready");
-  } catch (err) {
-    logger.warn({ err }, "geo_fences GIST index not created — PostGIS may not be installed.");
-  }
-
+  // ─── Campaign Targets ─────────────────────────────────────────────────────
   await db.query(`
-    CREATE TABLE IF NOT EXISTS campaigns (
-      campaign_id      UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-      fence_id         UUID        NOT NULL REFERENCES geo_fences(id) ON DELETE CASCADE,
-      title            TEXT        NOT NULL,
-      message_template TEXT        NOT NULL,
-      active           BOOLEAN     NOT NULL DEFAULT TRUE,
-      start_date       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      end_date         TIMESTAMPTZ
+    CREATE TABLE campaign_targets (
+      campaign_id        UUID  NOT NULL PRIMARY KEY REFERENCES campaigns(id) ON DELETE CASCADE,
+      demographic_filter JSONB,
+      language           TEXT
     );
   `);
 
+  // ─── Event Logs ───────────────────────────────────────────────────────────
   await db.query(`
-    CREATE TABLE IF NOT EXISTS event_logs (
+    CREATE TABLE event_logs (
       event_id   UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
       device_id  TEXT        NOT NULL REFERENCES devices(device_id) ON DELETE CASCADE,
       fence_id   UUID        NOT NULL REFERENCES geo_fences(id) ON DELETE CASCADE,
@@ -126,8 +167,8 @@ export async function runMigrations(): Promise<void> {
     );
   `);
 
-  await db.query(`CREATE INDEX IF NOT EXISTS event_logs_device_idx ON event_logs (device_id);`);
-  await db.query(`CREATE INDEX IF NOT EXISTS event_logs_fence_idx ON event_logs (fence_id);`);
+  await db.query(`CREATE INDEX event_logs_device_idx ON event_logs (device_id);`);
+  await db.query(`CREATE INDEX event_logs_fence_idx  ON event_logs (fence_id);`);
 
   // ─── Better-Auth tables ────────────────────────────────────────────────────
   await db.query(`

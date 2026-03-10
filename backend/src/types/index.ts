@@ -16,48 +16,117 @@ export interface RegisterDeviceBody {
   fcm_token?: string;
 }
 
-// ─── GeoFence ─────────────────────────────────────────────────────────────────
+// ─── Site Category ───────────────────────────────────────────────────────────
 
-export interface GeoFence {
+export type SiteCategory =
+  | "hospital"
+  | "college"
+  | "road"
+  | "bridge"
+  | "park"
+  | "utility"
+  | "transport"
+  | "other";
+
+// ─── Development Site ─────────────────────────────────────────────────────────
+
+export interface DevelopmentSite {
   id: string;
   name: string;
+  category: SiteCategory;
+  description?: string | null;
   latitude: number;
   longitude: number;
+  geo_polygon?: unknown;
+  impact_summary?: string | null;
+  start_date?: Date | null;
+  completion_date?: Date | null;
+  authority?: string | null;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface CreateSiteBody {
+  name: string;
+  category: SiteCategory;
+  description?: string;
+  latitude: number;
+  longitude: number;
+  impact_summary?: string;
+  start_date?: string;
+  completion_date?: string;
+  authority?: string;
+}
+
+// ─── GeoFence ─────────────────────────────────────────────────────────────────
+
+/** Raw geo_fences row */
+export interface GeoFence {
+  id: string;
+  site_id: string;
   radius: number;
-  category: string;
-  metadata: Record<string, unknown>;
-  project_info?: string | null;
+  active: boolean;
   created_at: Date;
 }
 
-export interface CreateFenceBody {
+/** geo_fences joined with development_sites — used in all API responses */
+export interface FenceWithSite extends GeoFence {
   name: string;
+  category: SiteCategory;
+  description?: string | null;
   latitude: number;
   longitude: number;
+  impact_summary?: string | null;
+  start_date?: Date | null;
+  completion_date?: Date | null;
+  authority?: string | null;
+}
+
+/** Creates both a development_site and a geo_fence in one request */
+export interface CreateFenceBody extends CreateSiteBody {
   radius: number;
-  category: string;
-  metadata?: Record<string, unknown>;
-  project_info?: string;
+  active?: boolean;
 }
 
 // ─── Campaign ─────────────────────────────────────────────────────────────────
 
+export type TriggerType = "entry" | "dwell" | "exit";
+
 export interface Campaign {
-  campaign_id: string;
-  fence_id: string;
+  id: string;
+  site_id: string;
   title: string;
-  message_template: string;
-  active: boolean;
-  start_date: Date;
-  end_date?: Date | null;
+  message: string;
+  media_url?: string | null;
+  start_time?: Date | null;
+  end_time?: Date | null;
+  trigger_type: TriggerType;
+  created_at: Date;
+}
+
+export interface CampaignTarget {
+  campaign_id: string;
+  demographic_filter?: Record<string, unknown> | null;
+  language?: string | null;
+}
+
+export interface CampaignWithTarget extends Campaign {
+  demographic_filter?: Record<string, unknown> | null;
+  language?: string | null;
 }
 
 export interface CreateCampaignBody {
-  fence_id: string;
+  site_id: string;
   title: string;
-  message_template: string;
-  start_date: string;
-  end_date?: string;
+  message: string;
+  media_url?: string;
+  start_time?: string;
+  end_time?: string;
+  trigger_type: TriggerType;
+  target?: {
+    demographic_filter?: Record<string, unknown>;
+    language?: string;
+  };
 }
 
 // ─── Events ───────────────────────────────────────────────────────────────────

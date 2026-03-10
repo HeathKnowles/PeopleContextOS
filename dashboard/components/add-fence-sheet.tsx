@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useMapSearch } from "@/components/map-search-context";
 import { useFences } from "@/components/fences-context";
 import { createFence } from "@/lib/fences-api";
+import type { SiteCategory } from "@/lib/types";
 import {
     Sheet,
     SheetContent,
@@ -25,16 +26,14 @@ interface Suggestion {
     display_name: string;
 }
 
-const CATEGORIES = [
-    "retail",
+const CATEGORIES: SiteCategory[] = [
+    "hospital",
+    "college",
+    "road",
+    "bridge",
+    "park",
+    "utility",
     "transport",
-    "education",
-    "health",
-    "hospitality",
-    "entertainment",
-    "government",
-    "residential",
-    "industrial",
     "other",
 ];
 
@@ -47,8 +46,12 @@ export function AddFenceSheet() {
     const [lat, setLat] = useState("");
     const [lon, setLon] = useState("");
     const [radius, setRadius] = useState("200");
-    const [category, setCategory] = useState("other");
-    const [projectInfo, setProjectInfo] = useState("");
+    const [category, setCategory] = useState<SiteCategory>("other");
+    const [description, setDescription] = useState("");
+    const [impactSummary, setImpactSummary] = useState("");
+    const [authority, setAuthority] = useState("");
+    const [startDate, setStartDate] = useState("");
+    const [completionDate, setCompletionDate] = useState("");
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -121,8 +124,9 @@ export function AddFenceSheet() {
     const handleClose = () => {
         setPendingPin(null);
         setName(""); setLat(""); setLon(""); setRadius("200");
-        setCategory("other"); setProjectInfo(""); setLocQuery("");
-        setSuggestions([]); setSuggestionsOpen(false); setError(null);
+        setCategory("other"); setDescription(""); setImpactSummary("");
+        setAuthority(""); setStartDate(""); setCompletionDate("");
+        setLocQuery(""); setSuggestions([]); setSuggestionsOpen(false); setError(null);
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -140,11 +144,15 @@ export function AddFenceSheet() {
         try {
             const fence = await createFence({
                 name: name.trim(),
+                category,
+                description: description.trim() || undefined,
                 latitude: parsedLat,
                 longitude: parsedLon,
+                impact_summary: impactSummary.trim() || undefined,
+                start_date: startDate || undefined,
+                completion_date: completionDate || undefined,
+                authority: authority.trim() || undefined,
                 radius: r,
-                category,
-                project_info: projectInfo.trim() || undefined,
             });
             addFence(fence); // instantly adds to the shared list
             handleClose();
@@ -278,7 +286,7 @@ export function AddFenceSheet() {
                         <select
                             id="fence-category"
                             value={category}
-                            onChange={(e) => setCategory(e.target.value)}
+                            onChange={(e) => setCategory(e.target.value as SiteCategory)}
                             disabled={saving}
                             className="h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:opacity-50"
                         >
@@ -288,16 +296,68 @@ export function AddFenceSheet() {
                         </select>
                     </div>
 
-                    {/* ── Project info ── */}
+                    {/* ── Description ── */}
                     <div className="flex flex-col gap-1.5">
-                        <Label htmlFor="fence-project">Project info (optional)</Label>
+                        <Label htmlFor="fence-desc">Description (optional)</Label>
+                        <textarea
+                            id="fence-desc"
+                            rows={2}
+                            placeholder="Brief description of the project"
+                            value={description}
+                            onChange={(e) => setDescription(e.target.value)}
+                            disabled={saving}
+                            className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:opacity-50 resize-none"
+                        />
+                    </div>
+
+                    {/* ── Authority ── */}
+                    <div className="flex flex-col gap-1.5">
+                        <Label htmlFor="fence-authority">Authority (optional)</Label>
                         <Input
-                            id="fence-project"
-                            placeholder="e.g. Q2 Campaign"
-                            value={projectInfo}
-                            onChange={(e) => setProjectInfo(e.target.value)}
+                            id="fence-authority"
+                            placeholder="e.g. Municipal Corporation"
+                            value={authority}
+                            onChange={(e) => setAuthority(e.target.value)}
                             disabled={saving}
                         />
+                    </div>
+
+                    {/* ── Impact summary ── */}
+                    <div className="flex flex-col gap-1.5">
+                        <Label htmlFor="fence-impact">Impact summary (optional)</Label>
+                        <textarea
+                            id="fence-impact"
+                            rows={2}
+                            placeholder="Civic message or impact description"
+                            value={impactSummary}
+                            onChange={(e) => setImpactSummary(e.target.value)}
+                            disabled={saving}
+                            className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:opacity-50 resize-none"
+                        />
+                    </div>
+
+                    {/* ── Dates ── */}
+                    <div className="grid grid-cols-2 gap-3">
+                        <div className="flex flex-col gap-1.5">
+                            <Label htmlFor="fence-start">Start date</Label>
+                            <Input
+                                id="fence-start"
+                                type="date"
+                                value={startDate}
+                                onChange={(e) => setStartDate(e.target.value)}
+                                disabled={saving}
+                            />
+                        </div>
+                        <div className="flex flex-col gap-1.5">
+                            <Label htmlFor="fence-end">Completion date</Label>
+                            <Input
+                                id="fence-end"
+                                type="date"
+                                value={completionDate}
+                                onChange={(e) => setCompletionDate(e.target.value)}
+                                disabled={saving}
+                            />
+                        </div>
                     </div>
 
                     {error && <p className="text-sm text-destructive">{error}</p>}

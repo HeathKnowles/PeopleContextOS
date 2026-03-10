@@ -1,14 +1,20 @@
 import { query } from "../db/client";
 import { getRedis } from "../db/redis";
-import { findFencesContainingPoint } from "./fenceService";
-import { getActiveCampaignForFence } from "./campaignService";
+import { findFencesContainingPoint, getFenceById } from "./fenceService";
+import { getActiveCampaignForSite } from "./campaignService";
 import { getDevice } from "./deviceService";
 import { sendPushNotification } from "./notificationService";
-import type { EventLog, LocationEventBody, TriggerEventBody } from "../types";
+import type { EventLog, LocationEventBody, TriggerEventBody, TriggerType } from "../types";
 import { logger } from "../utils/logger";
 
 // 30-minute dedup window: same device + same fence = one notification
 const DEDUP_TTL = 30 * 60;
+
+const TRIGGER_MAP: Record<"ENTER" | "EXIT" | "DWELL", TriggerType> = {
+  ENTER: "entry",
+  EXIT:  "exit",
+  DWELL: "dwell",
+};
 
 async function isDuplicate(deviceId: string, fenceId: string): Promise<boolean> {
   const key = `dedup:${deviceId}:${fenceId}`;
@@ -55,7 +61,7 @@ export async function processLocationEvent(
 
     await logEvent(device_id, fence.id, "ENTER", new Date(timestamp));
 
-    const campaign = await getActiveCampaignForFence(fence.id);
+    const campaign = await getActiveCampaignForSite(fence.site_id, "entry");
     if (!campaign) continue;
 
     if (!device?.fcm_token) {
@@ -63,10 +69,10 @@ export async function processLocationEvent(
       continue;
     }
 
-    const bodyText = campaign.message_template
+    const bodyText = campaign.message
       .replace(/\{\{name\}\}/g, fence.name)
       .replace(/\{\{category\}\}/g, fence.category)
-      .replace(/\{\{project_info\}\}/g, fence.project_info ?? "");
+      .replace(/\{\{impact_summary\}\}/g, fence.impact_summary ?? "");
 
     await sendPushNotification({
       device_id,
@@ -74,7 +80,7 @@ export async function processLocationEvent(
       title: campaign.title,
       body: bodyText,
       fence_id: fence.id,
-      data: { campaign_id: campaign.campaign_id, category: fence.category },
+      data: { campaign_id: campaign.id, category: fence.category },
     });
 
     notified++;
@@ -94,15 +100,14 @@ export async function processTriggerEvent(
 
   const eventLog = await logEvent(device_id, fence_id, event_type);
 
-  if (event_type !== "ENTER") {
-    return { logged: true, notified: false, message: "Non-ENTER event logged" };
-  }
-
   if (await isDuplicate(device_id, fence_id)) {
     return { logged: true, notified: false, message: "Duplicate suppressed" };
   }
 
-  const campaign = await getActiveCampaignForFence(fence_id);
+  const fence = await getFenceById(fence_id);
+  if (!fence) return { logged: true, notified: false, message: "Fence not found" };
+
+  const campaign = await getActiveCampaignForSite(fence.site_id, TRIGGER_MAP[event_type]);
   if (!campaign) {
     return { logged: true, notified: false, message: "No active campaign" };
   }
@@ -116,9 +121,9 @@ export async function processTriggerEvent(
     device_id,
     fcm_token: device.fcm_token,
     title: campaign.title,
-    body: campaign.message_template,
+    body: campaign.message,
     fence_id,
-    data: { event_id: eventLog.event_id, campaign_id: campaign.campaign_id },
+    data: { event_id: eventLog.event_id, campaign_id: campaign.id },
   });
 
   return { logged: true, notified: result.success };
