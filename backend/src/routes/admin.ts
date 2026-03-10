@@ -35,6 +35,33 @@ import type {
 } from "../types";
 
 export async function adminRoutes(app: FastifyInstance): Promise<void> {
+  // ─── One-time bootstrap ──────────────────────────────────────────────────
+  // POST /admin/bootstrap — promotes a user to admin by email.
+  // Only works while ZERO admins exist in the database (safe to leave in).
+  (app as any).post(
+    "/admin/bootstrap",
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const { email } = request.body as { email?: string };
+      if (!email) return reply.code(400).send({ success: false, error: "email required" });
+
+      // Refuse if any admin already exists
+      const existing = await query<{ count: string }>(
+        `SELECT COUNT(*) AS count FROM "user" WHERE role = 'admin'`
+      );
+      if (parseInt(existing[0]?.count ?? "1") > 0) {
+        return reply.code(403).send({ success: false, error: "An admin already exists. Use /admin/users/:id/role to promote additional users." });
+      }
+
+      const rows = await query<UserRecord>(
+        `UPDATE "user" SET role = 'admin', updated_at = NOW() WHERE email = $1 RETURNING id, name, email, role`,
+        [email]
+      );
+      if (!rows[0]) return reply.code(404).send({ success: false, error: "No account found with that email. Sign up first, then call this endpoint." });
+
+      return reply.send({ success: true, data: rows[0] });
+    }
+  );
+
   // ─── Session → JWT token exchange ───────────────────────────────────────
   // Called by the dashboard after login to get a Bearer token for /admin/* routes.
   (app as any).post(

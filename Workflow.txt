@@ -20,8 +20,7 @@ Backend
 2. Validate Data from Dashboard
 3. Start Stream Pipeline
 4. Send GeoFence Creation data to PostgresSQL + PostGIS Database
-5. Send metadata to CouchDB for storage
-6. Generate API keys for SDK
+5. Generate API keys for SDK
 
 
 SDK

@@ -16,7 +16,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { MapPin, Loader2, Search, X } from "lucide-react";
+import { MapPin, Loader2, Search, X, LocateFixed } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface Suggestion {
@@ -54,6 +54,7 @@ export function AddFenceSheet() {
     const [completionDate, setCompletionDate] = useState("");
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [locating, setLocating] = useState(false);
 
     // ── Inline location search state ─────────────────────────────────────────
     const [locQuery, setLocQuery] = useState("");
@@ -121,12 +122,48 @@ export function AddFenceSheet() {
         setSuggestionsOpen(false);
     };
 
+    const useCurrentLocation = () => {
+        if (!navigator.geolocation) {
+            setError("Geolocation is not supported by your browser.");
+            return;
+        }
+        setLocating(true);
+        setError(null);
+        navigator.geolocation.getCurrentPosition(
+            async (pos) => {
+                const { latitude, longitude } = pos.coords;
+                setLat(latitude.toFixed(6));
+                setLon(longitude.toFixed(6));
+                // Reverse-geocode to get a human-readable name
+                try {
+                    const res = await fetch(
+                        `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`,
+                        { headers: { "Accept-Language": "en", "User-Agent": "PeopleContextOS-Dashboard/1.0" } }
+                    );
+                    const data = await res.json();
+                    const label: string = data.display_name ?? `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
+                    setLocQuery(label);
+                    setName((prev) => prev || label.split(",")[0].trim());
+                } catch {
+                    setLocQuery(`${latitude.toFixed(5)}, ${longitude.toFixed(5)}`);
+                }
+                setLocating(false);
+            },
+            (err) => {
+                setError(`Could not get location: ${err.message}`);
+                setLocating(false);
+            },
+            { enableHighAccuracy: true, timeout: 10_000 }
+        );
+    };
+
     const handleClose = () => {
         setPendingPin(null);
         setName(""); setLat(""); setLon(""); setRadius("200");
         setCategory("other"); setDescription(""); setImpactSummary("");
         setAuthority(""); setStartDate(""); setCompletionDate("");
-        setLocQuery(""); setSuggestions([]); setSuggestionsOpen(false); setError(null);
+        setLocQuery(""); setSuggestions([]); setSuggestionsOpen(false);
+        setError(null); setLocating(false);
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -179,7 +216,22 @@ export function AddFenceSheet() {
                 >
                     {/* ── Location search ── */}
                     <div className="flex flex-col gap-1.5">
-                        <Label>Location</Label>
+                        <div className="flex items-center justify-between">
+                            <Label>Location</Label>
+                            <button
+                                type="button"
+                                onClick={useCurrentLocation}
+                                disabled={saving || locating}
+                                className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 disabled:opacity-50 transition-colors"
+                            >
+                                {locating ? (
+                                    <Loader2 className="size-3 animate-spin" />
+                                ) : (
+                                    <LocateFixed className="size-3" />
+                                )}
+                                {locating ? "Locating…" : "Use my location"}
+                            </button>
+                        </div>
                         <div ref={searchContainerRef} className="relative">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none" />
                             <input

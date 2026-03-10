@@ -1,13 +1,21 @@
 package com.example.app
 
 import android.Manifest
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.content.Context
 import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.app.ActivityCompat
+import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
+import com.google.firebase.messaging.FirebaseMessaging
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -64,12 +72,27 @@ class MainActivity : ComponentActivity() {
             ),
         )
 
+        createNotificationChannel()
         enableEdgeToEdge()
         setContent {
             AppTheme {
                 SDKDemoScreen()
             }
         }
+    }
+
+    private fun createNotificationChannel() {
+        val channel = NotificationChannel(
+            FENCE_CHANNEL_ID,
+            "Geofence Alerts",
+            NotificationManager.IMPORTANCE_HIGH,
+        ).apply {
+            description = "Alerts when you enter a monitored zone"
+            enableVibration(true)
+            enableLights(true)
+        }
+        (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
+            .createNotificationChannel(channel)
     }
 
     override fun onStop() {
@@ -94,6 +117,19 @@ fun SDKDemoScreen() {
 
     DisposableEffect(Unit) { onDispose { PeopleContextSDK.stopLocationTracking() } }
 
+    // Request POST_NOTIFICATIONS on Android 13+
+    val notifPermLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { /* granted or denied — notifications simply won't appear if denied */ }
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS)
+                != PackageManager.PERMISSION_GRANTED
+        ) {
+            notifPermLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
+
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
@@ -102,10 +138,10 @@ fun SDKDemoScreen() {
                 onActive  = { trackingActive = true; trackingError = null },
                 onResult  = { result ->
                     trackingLog.add(0, result)
-                    // Add new fences to overlay queue, deduplicated by fence_id
                     result.fences.forEach { fence ->
                         if (overlayQueue.none { it.fence_id == fence.fence_id }) {
                             overlayQueue.add(fence)
+                            postFenceNotification(context, fence)
                         }
                     }
                 },
@@ -142,18 +178,38 @@ fun SDKDemoScreen() {
                             registerLoading = true
                             registerError = false
                             registerStatus = "Registering…"
-                            PeopleContextSDK.registerDevice(
-                                onSuccess = {
-                                    registerLoading = false
-                                    registerError = false
-                                    registerStatus = "✓ ${it.message ?: "Registered"}\nID: ${it.data?.device_id}"
-                                },
-                                onError = {
-                                    registerLoading = false
-                                    registerError = true
-                                    registerStatus = "✗ $it"
-                                },
-                            )
+                            // Fetch the latest FCM token then register
+                            FirebaseMessaging.getInstance().token
+                                .addOnSuccessListener { token ->
+                                    PeopleContextSDK.registerDevice(
+                                        fcmToken = token,
+                                        onSuccess = {
+                                            registerLoading = false
+                                            registerError = false
+                                            registerStatus = "✓ ${it.message ?: "Registered"}\nID: ${it.data?.device_id}"
+                                        },
+                                        onError = {
+                                            registerLoading = false
+                                            registerError = true
+                                            registerStatus = "✗ $it"
+                                        },
+                                    )
+                                }
+                                .addOnFailureListener {
+                                    // No FCM token — register anyway without it
+                                    PeopleContextSDK.registerDevice(
+                                        onSuccess = {
+                                            registerLoading = false
+                                            registerError = false
+                                            registerStatus = "✓ ${it.message ?: "Registered"} (no FCM)\nID: ${it.data?.device_id}"
+                                        },
+                                        onError = {
+                                            registerLoading = false
+                                            registerError = true
+                                            registerStatus = "✗ $it"
+                                        },
+                                    )
+                                }
                         },
                     ) {
                         if (registerLoading) {
@@ -190,6 +246,7 @@ fun SDKDemoScreen() {
                                             result.fences.forEach { fence ->
                                                 if (overlayQueue.none { it.fence_id == fence.fence_id }) {
                                                     overlayQueue.add(fence)
+                                                    postFenceNotification(context, fence)
                                                 }
                                             }
                                         },
@@ -294,4 +351,29 @@ private fun StatusText(text: String, isError: Boolean) {
         color = if (isError) MaterialTheme.colorScheme.error
                 else MaterialTheme.colorScheme.onSurfaceVariant,
     )
+}
+
+const val FENCE_CHANNEL_ID = "geo_context_alerts"
+
+fun postFenceNotification(context: Context, fence: com.example.sdk.model.MatchedFenceInfo) {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+        ActivityCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS)
+            != PackageManager.PERMISSION_GRANTED
+    ) return
+
+    val title = fence.campaign_title ?: fence.name
+    val body  = fence.campaign_message
+        ?: fence.impact_summary
+        ?: "You have entered ${fence.name}"
+
+    val notification = NotificationCompat.Builder(context, FENCE_CHANNEL_ID)
+        .setSmallIcon(android.R.drawable.ic_dialog_map)
+        .setContentTitle(title)
+        .setContentText(body)
+        .setStyle(NotificationCompat.BigTextStyle().bigText(body))
+        .setPriority(NotificationCompat.PRIORITY_HIGH)
+        .setAutoCancel(true)
+        .build()
+
+    NotificationManagerCompat.from(context).notify(fence.fence_id.hashCode(), notification)
 }

@@ -27,10 +27,10 @@ export async function createFence(body: CreateFenceBody): Promise<FenceWithSite>
        INSERT INTO geo_fences (site_id, radius, geometry, active)
        SELECT
          site.id,
-         $10,
+         $10::float8,
          ST_Buffer(
            ST_SetSRID(ST_MakePoint(site.longitude, site.latitude), 4326)::geography,
-           $10
+           $10::float8
          ),
          $11
        FROM site
