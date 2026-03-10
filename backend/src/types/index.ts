@@ -158,6 +158,27 @@ export interface TriggerEventBody {
   event_type: "ENTER" | "EXIT" | "DWELL";
 }
 
+/** One matched fence returned in the /location/event response for SDK overlay rendering */
+export interface LocationEventFence {
+  fence_id: string;
+  name: string;
+  category: SiteCategory;
+  description?: string | null;
+  impact_summary?: string | null;
+  authority?: string | null;
+  /** Set when an active campaign exists for this fence */
+  campaign_title?: string;
+  campaign_message?: string;
+}
+
+/** Full result payload for POST /location/event */
+export interface LocationEventResult {
+  matched: number;
+  notified: number;
+  /** Matched fence details — used by the SDK to render in-app overlays */
+  fences: LocationEventFence[];
+}
+
 // ─── Notifications ────────────────────────────────────────────────────────────
 
 export interface NotificationPayload {
@@ -187,6 +208,46 @@ declare module "fastify" {
   interface FastifyRequest {
     user: JwtPayload;
   }
+}
+
+// ─── Users ───────────────────────────────────────────────────────────────────
+
+export type UserRole = "admin" | "customer";
+
+export interface UserRecord {
+  id: string;
+  name: string;
+  email: string;
+  email_verified: boolean;
+  role: UserRole;
+  created_at: Date;
+  updated_at: Date;
+}
+
+// ─── SDK API Keys ─────────────────────────────────────────────────────────────
+
+/** Row returned from sdk_api_keys (never exposes key_hash) */
+export interface ApiKey {
+  id: string;
+  /** First 12 chars of the raw key — safe to display in the dashboard */
+  key_prefix: string;
+  label: string;
+  created_by: string;
+  created_at: Date;
+  last_used?: Date | null;
+  active: boolean;
+}
+
+export interface CreateApiKeyBody {
+  label: string;
+}
+
+// ─── Stream Events ────────────────────────────────────────────────────────────
+
+/** Pushed to the `geo:events` Redis pub/sub channel and forwarded via SSE */
+export interface FenceStreamEvent extends LocationEventFence {
+  device_id: string;
+  occurred_at: string; // ISO-8601
 }
 
 // ─── API ──────────────────────────────────────────────────────────────────────

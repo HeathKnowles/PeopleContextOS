@@ -19,6 +19,13 @@ export const auth = betterAuth({
 
   // Map Better Auth's camelCase field names to the snake_case columns in the DB
   user: {
+    additionalFields: {
+      role: {
+        type: "string",
+        defaultValue: "customer",
+        input: false, // users cannot set their own role via sign-up
+      },
+    },
     fields: {
       emailVerified: "email_verified",
       createdAt:     "created_at",

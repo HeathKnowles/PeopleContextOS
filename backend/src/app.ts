@@ -8,6 +8,8 @@ import { deviceRoutes } from "./routes/device";
 import { locationRoutes } from "./routes/location";
 import { eventRoutes } from "./routes/event";
 import { adminRoutes } from "./routes/admin";
+import { apiKeyRoutes } from "./routes/apiKey";
+import { streamRoutes } from "./routes/stream";
 import { logger } from "./utils/logger";
 
 export async function buildApp(): Promise<FastifyInstance> {
@@ -74,6 +76,8 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(locationRoutes);
   await app.register(eventRoutes);
   await app.register(adminRoutes);
+  await app.register(apiKeyRoutes);
+  await app.register(streamRoutes);
 
   // ─── Error handler ───────────────────────────────────────────────────────
   app.setErrorHandler(

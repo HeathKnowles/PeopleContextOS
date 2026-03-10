@@ -4,7 +4,7 @@ import { findFencesContainingPoint, getFenceById } from "./fenceService";
 import { getActiveCampaignForSite } from "./campaignService";
 import { getDevice } from "./deviceService";
 import { sendPushNotification } from "./notificationService";
-import type { EventLog, LocationEventBody, TriggerEventBody, TriggerType } from "../types";
+import type { EventLog, LocationEventBody, TriggerEventBody, TriggerType, LocationEventFence, LocationEventResult, FenceStreamEvent } from "../types";
 import { logger } from "../utils/logger";
 
 // 30-minute dedup window: same device + same fence = one notification
@@ -47,21 +47,39 @@ async function logEvent(
  */
 export async function processLocationEvent(
   body: LocationEventBody
-): Promise<{ matched: number; notified: number }> {
+): Promise<LocationEventResult> {
   const { device_id, lat, lng, timestamp } = body;
 
   const fences = await findFencesContainingPoint(lat, lng);
-  if (fences.length === 0) return { matched: 0, notified: 0 };
+  if (fences.length === 0) return { matched: 0, notified: 0, fences: [] };
 
   const device = await getDevice(device_id);
   let notified = 0;
+  const fenceDetails: LocationEventFence[] = [];
 
   for (const fence of fences) {
+    // Fetch campaign first so we can include it in the overlay payload
+    const campaign = await getActiveCampaignForSite(fence.site_id, "entry");
+
+    // Always push fence details — the SDK needs them to render the overlay
+    // regardless of whether dedup suppresses the FCM push.
+    fenceDetails.push({
+      fence_id: fence.id,
+      name: fence.name,
+      category: fence.category,
+      description: fence.description,
+      impact_summary: fence.impact_summary,
+      authority: fence.authority,
+      ...(campaign
+        ? { campaign_title: campaign.title, campaign_message: campaign.message }
+        : {}),
+    });
+
+    // Dedup: skip FCM + event log if already fired within the 30-min window
     if (await isDuplicate(device_id, fence.id)) continue;
 
     await logEvent(device_id, fence.id, "ENTER", new Date(timestamp));
 
-    const campaign = await getActiveCampaignForSite(fence.site_id, "entry");
     if (!campaign) continue;
 
     if (!device?.fcm_token) {
@@ -86,7 +104,28 @@ export async function processLocationEvent(
     notified++;
   }
 
-  return { matched: fences.length, notified };
+  // Broadcast matched fences to the dashboard via Redis pub/sub → SSE
+  if (fenceDetails.length > 0) {
+    void publishFenceEvents(device_id, fenceDetails);
+  }
+
+  return { matched: fences.length, notified, fences: fenceDetails };
+}
+
+async function publishFenceEvents(
+  device_id: string,
+  fenceDetails: LocationEventFence[]
+): Promise<void> {
+  const redis = getRedis();
+  const occurred_at = new Date().toISOString();
+  for (const fence of fenceDetails) {
+    const event: FenceStreamEvent = { ...fence, device_id, occurred_at };
+    try {
+      await redis.publish("geo:events", JSON.stringify(event));
+    } catch (err) {
+      logger.warn({ err, fence_id: fence.fence_id }, "Failed to publish fence event to Redis");
+    }
+  }
 }
 
 /**

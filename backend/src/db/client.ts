@@ -178,10 +178,13 @@ export async function runMigrations(): Promise<void> {
       email          TEXT        NOT NULL UNIQUE,
       email_verified BOOLEAN     NOT NULL DEFAULT FALSE,
       image          TEXT,
+      role           TEXT        NOT NULL DEFAULT 'customer',
       created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
   `);
+  // Ensure role column exists on databases created before this migration
+  await db.query(`ALTER TABLE "user" ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT 'customer';`);
 
   await db.query(`
     CREATE TABLE IF NOT EXISTS "session" (
@@ -230,6 +233,22 @@ export async function runMigrations(): Promise<void> {
   await db.query(`CREATE INDEX IF NOT EXISTS account_user_id_idx         ON "account"(user_id);`);
   await db.query(`CREATE INDEX IF NOT EXISTS account_provider_idx        ON "account"(provider_id, account_id);`);
   await db.query(`CREATE INDEX IF NOT EXISTS verification_identifier_idx ON "verification"(identifier);`);
+
+  // ─── SDK API Keys ─────────────────────────────────────────────────────────
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS sdk_api_keys (
+      id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+      key_hash    TEXT        NOT NULL UNIQUE,
+      key_prefix  TEXT        NOT NULL,
+      label       TEXT        NOT NULL,
+      created_by  TEXT        NOT NULL,
+      created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      last_used   TIMESTAMPTZ,
+      active      BOOLEAN     NOT NULL DEFAULT TRUE
+    );
+  `);
+  await db.query(`CREATE INDEX IF NOT EXISTS api_keys_active_idx ON sdk_api_keys (active);`);
+  await db.query(`CREATE INDEX IF NOT EXISTS api_keys_created_by_idx ON sdk_api_keys (created_by);`);
 
   logger.info("Database migrations complete");
 }

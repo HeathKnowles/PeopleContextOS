@@ -1,8 +1,9 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { fromNodeHeaders } from "better-auth/node";
 import { auth } from "../lib/auth";
-import { jwtAuth } from "../middleware/auth";
+import { jwtAuth, adminOnly } from "../middleware/auth";
 import { signToken } from "../utils/jwt";
+import { query } from "../db/client";
 import {
   createFence,
   getFenceById,
@@ -29,6 +30,8 @@ import type {
   DevelopmentSite,
   Campaign,
   CampaignWithTarget,
+  UserRecord,
+  UserRole,
 } from "../types";
 
 export async function adminRoutes(app: FastifyInstance): Promise<void> {
@@ -45,7 +48,8 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
           .code(401)
           .send({ success: false, error: "Not authenticated" } satisfies ApiResponse);
       }
-      const token = signToken(session.user.id, { role: "admin" });
+      const userRole = (session.user as { role?: string }).role ?? "customer";
+      const token = signToken(session.user.id, { role: userRole });
       return reply.send({ success: true, data: { token } } satisfies ApiResponse<{ token: string }>);
     }
   );
@@ -54,7 +58,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
 
   (app as any).post(
     "/admin/fences",
-    { preHandler: [jwtAuth] },
+    { preHandler: [jwtAuth, adminOnly] },
     async (request: FastifyRequest<{ Body: CreateFenceBody }>, reply: FastifyReply) => {
       const { name, category, latitude, longitude, radius } = request.body;
       if (!name || !category || latitude == null || longitude == null || radius == null) {
@@ -72,7 +76,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
 
   (app as any).get(
     "/admin/fences",
-    { preHandler: [jwtAuth] },
+    { preHandler: [jwtAuth, adminOnly] },
     async (request: FastifyRequest<{ Querystring: { limit?: string; offset?: string } }>, reply: FastifyReply) => {
       const limit = request.query.limit ? parseInt(request.query.limit, 10) : 100;
       const offset = request.query.offset ? parseInt(request.query.offset, 10) : 0;
@@ -83,7 +87,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
 
   (app as any).get(
     "/admin/fences/:id",
-    { preHandler: [jwtAuth] },
+    { preHandler: [jwtAuth, adminOnly] },
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
       const fence = await getFenceById(request.params.id);
       if (!fence) {
@@ -97,7 +101,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
 
   (app as any).delete(
     "/admin/fences/:id",
-    { preHandler: [jwtAuth] },
+    { preHandler: [jwtAuth, adminOnly] },
     async (request: FastifyRequest<{Params: {id: string}}>, reply: FastifyReply) => {
       const deleted = await deleteFence(request.params.id);
       if (!deleted) {
@@ -115,7 +119,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
 
   (app as any).get(
     "/admin/sites",
-    { preHandler: [jwtAuth] },
+    { preHandler: [jwtAuth, adminOnly] },
     async (request: FastifyRequest<{ Querystring: { limit?: string; offset?: string } }>, reply: FastifyReply) => {
       const limit = request.query.limit ? parseInt(request.query.limit, 10) : 100;
       const offset = request.query.offset ? parseInt(request.query.offset, 10) : 0;
@@ -126,7 +130,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
 
   (app as any).get(
     "/admin/sites/:id",
-    { preHandler: [jwtAuth] },
+    { preHandler: [jwtAuth, adminOnly] },
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
       const site = await getSiteById(request.params.id);
       if (!site) {
@@ -138,7 +142,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
 
   (app as any).patch(
     "/admin/sites/:id",
-    { preHandler: [jwtAuth] },
+    { preHandler: [jwtAuth, adminOnly] },
     async (request: FastifyRequest<{ Params: { id: string }; Body: Partial<CreateSiteBody> }>, reply: FastifyReply) => {
       const site = await updateSite(request.params.id, request.body);
       if (!site) {
@@ -150,7 +154,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
 
   (app as any).delete(
     "/admin/sites/:id",
-    { preHandler: [jwtAuth] },
+    { preHandler: [jwtAuth, adminOnly] },
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
       const deleted = await deleteSite(request.params.id);
       if (!deleted) {
@@ -163,7 +167,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
 
   (app as any).post(
     "/admin/campaigns",
-    { preHandler: [jwtAuth] },
+    { preHandler: [jwtAuth, adminOnly] },
     async (request: FastifyRequest<{ Body: CreateCampaignBody }>, reply: FastifyReply) => {
       const { site_id, title, message, trigger_type } = request.body;
       if (!site_id || !title || !message || !trigger_type) {
@@ -181,13 +185,53 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
 
   (app as any).get(
     "/admin/campaigns",
-    { preHandler: [jwtAuth] },
+    { preHandler: [jwtAuth, adminOnly] },
     async (request: FastifyRequest<{ Querystring: { site_id?: string } }>, reply: FastifyReply) => {
       const campaigns = await listCampaigns(request.query.site_id);
       return reply.send({
         success: true,
         data: campaigns,
       } satisfies ApiResponse<CampaignWithTarget[]>);
+    }
+  );
+
+  // ─── User Management (admin only) ────────────────────────────────────────
+
+  (app as any).get(
+    "/admin/users",
+    { preHandler: [jwtAuth, adminOnly] },
+    async (_request: FastifyRequest, reply: FastifyReply) => {
+      const users = await query<UserRecord>(
+        `SELECT id, name, email, email_verified, role, created_at, updated_at
+         FROM "user" ORDER BY created_at DESC`
+      );
+      return reply.send({ success: true, data: users } satisfies ApiResponse<UserRecord[]>);
+    }
+  );
+
+  (app as any).patch(
+    "/admin/users/:id/role",
+    { preHandler: [jwtAuth, adminOnly] },
+    async (
+      request: FastifyRequest<{ Params: { id: string }; Body: { role: UserRole } }>,
+      reply: FastifyReply
+    ) => {
+      const { role } = request.body;
+      if (!(["admin", "customer"] as UserRole[]).includes(role)) {
+        return reply.code(400).send({
+          success: false,
+          error: "role must be 'admin' or 'customer'",
+        } satisfies ApiResponse);
+      }
+      const rows = await query<UserRecord>(
+        `UPDATE "user" SET role = $1, updated_at = NOW() WHERE id = $2
+         RETURNING id, name, email, email_verified, role, created_at, updated_at`,
+        [role, request.params.id]
+      );
+      if (!rows[0]) {
+        return reply.code(404).send({ success: false, error: "User not found" } satisfies ApiResponse);
+      }
+      return reply.send({ success: true, data: rows[0] } satisfies ApiResponse<UserRecord>);
     }
   );
 }
