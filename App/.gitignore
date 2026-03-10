@@ -1,6 +1,8 @@
 *.iml
 .gradle
 /local.properties
+# Firebase — never commit, generate from env
+app/google-services.json
 /.idea/caches
 /.idea/libraries
 /.idea/modules.xml

@@ -1,0 +1,6 @@
+# Firebase — keep out of version control
+google-services.json
+App/app/google-services.json
+
+# Backend secrets
+backend/.env
