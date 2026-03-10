@@ -8,6 +8,29 @@ export type SiteCategory =
     | "transport"
     | "other";
 
+export type UserRole = "admin" | "customer";
+
+export interface UserRecord {
+    id: string;
+    name: string;
+    email: string;
+    email_verified: boolean;
+    role: UserRole;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface ApiKey {
+    id: string;
+    /** First 12 chars of the raw key — safe to display */
+    key_prefix: string;
+    label: string;
+    created_by: string;
+    created_at: string;
+    last_used?: string | null;
+    active: boolean;
+}
+
 export interface GeoFence {
     id: string;       // geo_fences.id
     site_id: string;
